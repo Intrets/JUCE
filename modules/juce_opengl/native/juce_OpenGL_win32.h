@@ -37,7 +37,7 @@ class OpenGLContext::NativeContext
 public:
     NativeContext (Component& component,
                    const OpenGLPixelFormat& pixelFormat,
-                   void* contextToShareWithIn,
+                   void* contextToShareWith,
                    bool /*useMultisampling*/,
                    OpenGLVersion)
     {
@@ -52,15 +52,24 @@ public:
         if (pixFormat != 0)
             SetPixelFormat (dc, pixFormat, &pfd);
 
-        renderContext = wglCreateContext (dc);
 
-        if (renderContext != nullptr)
+        int attribs[] =
         {
-            makeActive();
+            WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+            WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+            WGL_CONTEXT_FLAGS_ARB, 0,
+            0
+        };
+
+        auto tempContext = wglCreateContext (dc);
+
+        if (tempContext != nullptr)
+        {
+            wglMakeCurrent(dc, tempContext);
             initialiseGLExtensions();
 
             auto wglFormat = wglChoosePixelFormatExtension (pixelFormat);
-            deactivateCurrentContext();
+            wglMakeCurrent(nullptr, nullptr);
 
             if (wglFormat != pixFormat && wglFormat != 0)
             {
@@ -70,15 +79,17 @@ public:
                 nativeWindow = nullptr;
                 createNativeWindow (component);
 
-                if (SetPixelFormat (dc, wglFormat, &pfd))
+                if (!SetPixelFormat (dc, wglFormat, &pfd))
                 {
-                    deleteRenderContext();
-                    renderContext = wglCreateContext (dc);
+                    std::abort();
                 }
             }
 
-            if (contextToShareWithIn != nullptr)
-                wglShareLists ((HGLRC) contextToShareWithIn, renderContext);
+            renderContext = wglCreateContextAttribsARB (dc, tempContext, attribs);
+            wglDeleteContext (tempContext);
+
+            if (contextToShareWith != nullptr)
+                wglShareLists ((HGLRC) contextToShareWith, renderContext);
 
             component.getTopLevelComponent()->repaint();
             component.repaint();
@@ -185,6 +196,7 @@ private:
     JUCE_DECLARE_WGL_EXTENSION_FUNCTION (wglChoosePixelFormatARB,  BOOL, (HDC, const int*, const FLOAT*, UINT, int*, UINT*))
     JUCE_DECLARE_WGL_EXTENSION_FUNCTION (wglSwapIntervalEXT,       BOOL, (int))
     JUCE_DECLARE_WGL_EXTENSION_FUNCTION (wglGetSwapIntervalEXT,    int, ())
+    JUCE_DECLARE_WGL_EXTENSION_FUNCTION (wglCreateContextAttribsARB, HGLRC, (HDC, HGLRC, const int*))
     #undef JUCE_DECLARE_WGL_EXTENSION_FUNCTION
 
    #if JUCE_WIN_PER_MONITOR_DPI_AWARE
@@ -212,6 +224,7 @@ private:
         JUCE_INIT_WGL_FUNCTION (wglChoosePixelFormatARB);
         JUCE_INIT_WGL_FUNCTION (wglSwapIntervalEXT);
         JUCE_INIT_WGL_FUNCTION (wglGetSwapIntervalEXT);
+        JUCE_INIT_WGL_FUNCTION (wglCreateContextAttribsARB);
         #undef JUCE_INIT_WGL_FUNCTION
     }
 
