@@ -23,6 +23,10 @@
   ==============================================================================
 */
 
+#include <dwmapi.h>
+
+#pragma comment(lib, "dwmapi.lib")
+
 namespace juce
 {
 
@@ -119,7 +123,10 @@ public:
     static void deactivateCurrentContext()  { wglMakeCurrent (nullptr, nullptr); }
     bool makeActive() const noexcept        { return isActive() || wglMakeCurrent (dc, renderContext) != FALSE; }
     bool isActive() const noexcept          { return wglGetCurrentContext() == renderContext; }
-    void swapBuffers() const noexcept       { SwapBuffers (dc); }
+    void swapBuffers() const noexcept {
+        DwmFlush();
+        SwapBuffers (dc);
+    }
 
     bool setSwapInterval (int numFramesPerSwap)
     {
